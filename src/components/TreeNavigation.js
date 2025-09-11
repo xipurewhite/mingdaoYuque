@@ -9,6 +9,31 @@ const TreeContainer = styled.div`
   padding: 16px;
   height: 100%;
   overflow-y: auto;
+  
+  /* V2版本：响应式优化 */
+  @media (max-width: 768px) {
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  /* 滚动条样式优化 */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+    
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
 `;
 
 const TreeNode = styled.div`
@@ -18,18 +43,31 @@ const TreeNode = styled.div`
 const NodeHeader = styled.div`
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 12px;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-height: 44px; /* V2版本：触摸友好 */
   
   &:hover {
     background-color: #f0f0f0;
+    transform: translateX(2px);
   }
   
   &.active {
     background-color: #e6f7ff;
     color: #1890ff;
+    font-weight: 500;
+  }
+  
+  /* V2版本：触摸反馈 */
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 12px;
+    min-height: 48px;
   }
 `;
 
@@ -56,31 +94,60 @@ const NodeTitle = styled.span`
 
 const NodeChildren = styled.div`
   margin-left: 20px;
-  border-left: 1px solid #e8e8e8;
-  padding-left: 8px;
+  border-left: 2px solid #e8e8e8;
+  padding-left: 12px;
+  margin-top: 4px;
+  
+  /* V2版本：优化层级显示 */
+  ${TreeNode} {
+    margin-bottom: 2px;
+  }
+  
+  /* 嵌套层级样式 */
+  ${NodeChildren} {
+    border-left-color: #d0d0d0;
+    margin-left: 16px;
+  }
 `;
 
 const DocumentItem = styled.div`
-  padding: 6px 12px;
+  padding: 8px 12px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 13px;
   color: #666;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  min-height: 40px; /* V2版本：触摸友好 */
+  display: flex;
+  align-items: center;
   
   &:hover {
     background-color: #f0f0f0;
     color: #333;
+    transform: translateX(4px);
   }
   
   &.active {
     background-color: #e6f7ff;
     color: #1890ff;
     font-weight: 500;
+    border-left: 3px solid #1890ff;
+  }
+  
+  /* V2版本：触摸反馈 */
+  &:active {
+    transform: scale(0.98);
   }
   
   .document-icon {
-    margin-right: 6px;
+    margin-right: 8px;
+    font-size: 14px;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 10px 12px;
+    min-height: 44px;
+    font-size: 14px;
   }
 `;
 

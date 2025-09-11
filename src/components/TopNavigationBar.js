@@ -20,50 +20,12 @@ const TopNavContainer = styled.div`
   top: 0;
   z-index: 100;
   flex-shrink: 0;
+  
+  /* V2版：顶部导航栏覆盖文档内容区域，跟随宽度变化 */
   width: 100%;
-  
-  /* 根据侧边栏状态调整最大宽度 */
-  max-width: ${props => {
-    const { $leftCollapsed, $rightCollapsed, $screenWidth } = props;
-    
-    // 小屏幕：全宽显示
-    if ($screenWidth < 768) {
-      return '100%';
-    }
-    
-    // 根据显示模式确定最大宽度
-    if ($leftCollapsed && $rightCollapsed) {
-      // 单栏显示：根据屏幕大小调整最大宽度，但不超过屏幕宽度
-      if ($screenWidth >= 1600) {
-        return '1400px';
-      } else if ($screenWidth >= 1200) {
-        return '1200px';
-      } else {
-        return '1000px';
-      }
-    } else if ($leftCollapsed || $rightCollapsed) {
-      // 双栏显示：根据屏幕大小调整最大宽度
-      if ($screenWidth >= 1600) {
-        return '1200px';
-      } else if ($screenWidth >= 1200) {
-        return '1000px';
-      } else {
-        return '800px';
-      }
-    } else {
-      // 三栏显示：根据屏幕大小调整最大宽度
-      if ($screenWidth >= 1600) {
-        return '1000px';
-      } else if ($screenWidth >= 1200) {
-        return '800px';
-      } else {
-        return '600px';
-      }
-    }
-  }};
-  
-  margin: 0 auto;
-  transition: max-width 0.3s ease;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
 `;
 
 const DocumentInfo = styled.div`
@@ -130,16 +92,42 @@ const LoadingSpinner = styled.div`
   }
 `;
 
+const ToggleButton = styled.button`
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  margin-right: 12px;
+  
+  &:hover {
+    border-color: #1890ff;
+    color: #1890ff;
+    background: #f0f8ff;
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
 /**
- * 顶部导航栏组件
+ * V2版顶部导航栏组件
  * @param {object} props - 组件属性
  * @param {object} props.currentDocument - 当前文档对象
  * @param {object} props.config - 明道云配置对象
  * @param {function} props.onEditSuccess - 编辑成功回调
  * @param {function} props.onEditError - 编辑失败回调
  * @param {boolean} props.leftCollapsed - 左侧导航栏是否折叠
- * @param {boolean} props.rightCollapsed - 右侧大纲栏是否折叠
  * @param {number} props.screenWidth - 屏幕宽度
+ * @param {function} props.onToggleLeft - 切换左侧导航栏回调
  */
 export default function TopNavigationBar({ 
   currentDocument, 
@@ -147,8 +135,8 @@ export default function TopNavigationBar({
   onEditSuccess,
   onEditError,
   leftCollapsed = false,
-  rightCollapsed = false,
-  screenWidth = 1200
+  screenWidth = 1200,
+  onToggleLeft
 }) {
   // 解析最后修改人信息
   const parseLastModifier = (uaid) => {
@@ -245,12 +233,15 @@ export default function TopNavigationBar({
   const lastModifyTime = formatModifyTime(currentDocument?.utime);
 
   return (
-    <TopNavContainer
-      $leftCollapsed={leftCollapsed}
-      $rightCollapsed={rightCollapsed}
-      $screenWidth={screenWidth}
-    >
+    <TopNavContainer>
       <DocumentInfo>
+        <ToggleButton 
+          onClick={onToggleLeft}
+          title={leftCollapsed ? '展开导航栏' : '收起导航栏'}
+        >
+          {leftCollapsed ? '▶' : '◀'}
+        </ToggleButton>
+        
         <InfoItem>
           <InfoLabel>最后修改人：</InfoLabel>
           <InfoValue>

@@ -183,26 +183,8 @@ export default function DocumentOutline({ content, onHeadingChange }) {
   const scrollToHeading = (headingId) => {
     const element = document.getElementById(headingId);
     if (element) {
-      // 获取主内容区域的滚动容器
-      const mainContent = document.querySelector('main');
-      if (mainContent) {
-        // 计算元素相对于滚动容器的位置
-        const containerRect = mainContent.getBoundingClientRect();
-        const elementRect = element.getBoundingClientRect();
-        const scrollTop = mainContent.scrollTop + (elementRect.top - containerRect.top) - 20; // 20px偏移
-        
-        // 平滑滚动到目标位置
-        mainContent.scrollTo({
-          top: scrollTop,
-          behavior: 'smooth'
-        });
-      } else {
-        // 如果没有找到滚动容器，使用默认的scrollIntoView
-        element.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'start'
-        });
-      }
+      // 借助CSS中标题的 scroll-margin-top，使用原生定位，避免偏移误差
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveId(headingId);
     } else {
       console.warn(`未找到ID为 ${headingId} 的标题元素`);

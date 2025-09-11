@@ -8,6 +8,31 @@ import { sanitizeHTML, addHeadingIds } from '../utils/dataUtils';
 import { saveReadingProgress, restoreReadingPosition } from '../utils/readingProgress';
 import LazyImage from './LazyImage';
 
+// 文档标题样式
+const DocumentTitle = styled.h1`
+  font-size: 2.5em;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 24px 0;
+  padding: 0 0 16px 0;
+  border-bottom: 2px solid #eaecef;
+  line-height: 1.2;
+  text-align: left;
+  
+  /* 响应式字体大小 */
+  @media (max-width: 768px) {
+    font-size: 2em;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+  }
+  
+  @media (min-width: 1200px) {
+    font-size: 2.8em;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+  }
+`;
+
 const ContentContainer = styled.div`
   width: 100%;
   margin: 0;
@@ -15,98 +40,174 @@ const ContentContainer = styled.div`
   line-height: 1.8;
   color: #333;
   
-  /* 富文本内容样式 */
+  /* V2版本：优化阅读体验 */
+  font-size: 16px;
+  max-width: none;
+  
+  /* 响应式字体大小 */
+  @media (max-width: 768px) {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  
+  @media (min-width: 1200px) {
+    font-size: 17px;
+    line-height: 1.9;
+  }
+  
+  /* V2版本：优化标题样式 */
   h1, h2, h3, h4, h5, h6 {
-    margin: 24px 0 16px 0;
+    margin: 32px 0 20px 0;
     font-weight: 600;
-    line-height: 1.25;
-    color: #24292e;
+    line-height: 1.3;
+    color: #1a1a1a;
+    scroll-margin-top: 80px; /* 为固定导航栏留出空间 */
+    
+    /* 添加标题锚点样式 */
+    position: relative;
+    
+    &:hover::before {
+      content: '#';
+      position: absolute;
+      left: -20px;
+      color: #0366d6;
+      opacity: 0.7;
+      font-weight: normal;
+    }
   }
   
   h1 {
-    font-size: 2em;
-    border-bottom: 1px solid #eaecef;
-    padding-bottom: 0.3em;
+    font-size: 2.2em;
+    border-bottom: 2px solid #eaecef;
+    padding-bottom: 0.4em;
+    margin-top: 0;
   }
   
   h2 {
-    font-size: 1.5em;
+    font-size: 1.8em;
     border-bottom: 1px solid #eaecef;
     padding-bottom: 0.3em;
   }
   
   h3 {
-    font-size: 1.25em;
+    font-size: 1.4em;
   }
   
   h4 {
-    font-size: 1em;
+    font-size: 1.2em;
   }
   
   h5 {
-    font-size: 0.875em;
+    font-size: 1.1em;
   }
   
   h6 {
-    font-size: 0.85em;
+    font-size: 1em;
     color: #6a737d;
   }
   
+  /* V2版本：优化段落和列表样式 */
   p {
-    margin: 16px 0;
+    margin: 20px 0;
+    text-align: justify;
+    text-justify: inter-ideograph;
+    
+    /* 首段缩进 */
+    &:first-of-type {
+      text-indent: 2em;
+    }
   }
   
   blockquote {
-    margin: 16px 0;
-    padding: 0 16px;
+    margin: 24px 0;
+    padding: 16px 20px;
     color: #6a737d;
-    border-left: 4px solid #dfe2e5;
+    border-left: 4px solid #0366d6;
+    background: #f8f9fa;
+    border-radius: 0 6px 6px 0;
+    font-style: italic;
+    
+    p {
+      margin: 0;
+      text-indent: 0;
+    }
   }
   
   ul, ol {
-    margin: 16px 0;
+    margin: 20px 0;
     padding-left: 30px;
+    
+    /* 嵌套列表样式 */
+    ul, ol {
+      margin: 8px 0;
+    }
   }
   
   li {
-    margin: 4px 0;
+    margin: 8px 0;
+    line-height: 1.6;
+    
+    /* 列表项内容优化 */
+    p {
+      margin: 4px 0;
+      text-indent: 0;
+    }
   }
   
+  /* V2版本：优化表格样式 */
   table {
     border-collapse: collapse;
-    margin: 16px 0;
+    margin: 24px 0;
     width: 100%;
     border: 1px solid #d0d7de;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   
   th, td {
     border: 1px solid #d0d7de;
-    padding: 8px 12px;
+    padding: 12px 16px;
     text-align: left;
+    vertical-align: top;
   }
   
   th {
     background-color: #f6f8fa;
     font-weight: 600;
+    color: #24292e;
   }
   
+  tr:nth-child(even) {
+    background-color: #f8f9fa;
+  }
+  
+  tr:hover {
+    background-color: #e3f2fd;
+  }
+  
+  /* V2版本：优化代码样式 */
   code {
     background-color: #f6f8fa;
-    border-radius: 3px;
-    font-size: 85%;
-    margin: 0;
+    border-radius: 4px;
+    font-size: 87%;
+    margin: 0 2px;
     padding: 0.2em 0.4em;
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    color: #e83e8c;
+    border: 1px solid #e1e4e8;
   }
   
   pre {
     background-color: #f6f8fa;
-    border-radius: 6px;
-    font-size: 85%;
-    line-height: 1.45;
+    border-radius: 8px;
+    font-size: 87%;
+    line-height: 1.5;
     overflow: auto;
-    padding: 16px;
-    margin: 16px 0;
+    padding: 20px;
+    margin: 24px 0;
+    border: 1px solid #e1e4e8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     
     code {
       background-color: transparent;
@@ -118,35 +219,60 @@ const ContentContainer = styled.div`
       overflow: visible;
       padding: 0;
       word-wrap: normal;
+      color: #24292e;
     }
   }
   
+  /* V2版本：优化图片样式 */
   img {
     max-width: 100%;
     height: auto;
-    border-radius: 6px;
-    margin: 16px 0;
+    border-radius: 8px;
+    margin: 24px 0;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     
     &:hover {
       transform: scale(1.02);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     }
   }
   
+  /* V2版本：优化链接样式 */
   a {
     color: #0366d6;
     text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
     
     &:hover {
-      text-decoration: underline;
+      color: #0256cc;
+      border-bottom-color: #0366d6;
+    }
+    
+    &:visited {
+      color: #6f42c1;
     }
   }
   
+  /* V2版本：优化分割线样式 */
   hr {
     border: none;
-    border-top: 1px solid #eaecef;
-    margin: 24px 0;
+    border-top: 2px solid #eaecef;
+    margin: 32px 0;
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 2px;
+      background: #0366d6;
+    }
   }
 `;
 
@@ -168,6 +294,52 @@ const EmptyState = styled.div`
   .empty-hint {
     font-size: 14px;
     color: #ccc;
+  }
+`;
+
+// V2版本：阅读进度指示器
+const ReadingProgress = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: ${props => props.$progress}%;
+  height: 3px;
+  background: linear-gradient(90deg, #0366d6, #28a745);
+  z-index: 1000;
+  transition: width 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+`;
+
+// V2版本：内容导航提示
+const ContentNavigation = styled.div`
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  font-size: 14px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+  }
+  
+  .nav-icon {
+    font-size: 16px;
+  }
+  
+  @media (max-width: 768px) {
+    display: none;
   }
 `;
 
@@ -306,6 +478,8 @@ export default function RichTextRenderer({
   const [activeHeadingId, setActiveHeadingId] = useState('');
   const [imageScale, setImageScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [showNavigation, setShowNavigation] = useState(false);
   const imageRef = useRef(null);
   const positionRef = useRef({ x: 0, y: 0 });
   const scaleRef = useRef(1);
@@ -349,7 +523,7 @@ export default function RichTextRenderer({
     }
   }, [content, applyTransform]);
 
-  // 监听滚动，保存阅读进度
+  // V2版本：监听滚动，计算阅读进度和保存进度
   useEffect(() => {
     if (!documentId) return;
     
@@ -358,8 +532,15 @@ export default function RichTextRenderer({
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const documentHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = Math.min((scrollTop / documentHeight) * 100, 100);
+        
+        setReadingProgress(progress);
         saveReadingProgress(documentId, scrollTop, activeHeadingId);
-      }, 1000);
+        
+        // 显示/隐藏内容导航
+        setShowNavigation(scrollTop > 200);
+      }, 100);
     };
     
     window.addEventListener('scroll', handleScroll);
@@ -387,6 +568,15 @@ export default function RichTextRenderer({
       onContentChange(content);
     }
   }, [content, onContentChange]);
+  
+  // V2版本：内容导航功能
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+  
+  const scrollToBottom = useCallback(() => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+  }, []);
 
   // 关闭图片查看器
   const closeImageViewer = () => {
@@ -514,13 +704,19 @@ export default function RichTextRenderer({
 
   if (!content || !content.trim()) {
     return (
-      <ContentContainer>
-        <EmptyState>
-          <div className="empty-icon">📄</div>
-          <div className="empty-text">暂无内容</div>
-          <div className="empty-hint">请选择左侧的文档查看内容</div>
-        </EmptyState>
-      </ContentContainer>
+      <>
+        {/* 即使没有内容，也显示标题 */}
+        {title && title.trim() && (
+          <DocumentTitle>{title}</DocumentTitle>
+        )}
+        <ContentContainer>
+          <EmptyState>
+            <div className="empty-icon">📄</div>
+            <div className="empty-text">暂无内容</div>
+            <div className="empty-hint">请选择左侧的文档查看内容</div>
+          </EmptyState>
+        </ContentContainer>
+      </>
     );
   }
   
@@ -530,9 +726,50 @@ export default function RichTextRenderer({
   
   return (
     <>
+      {/* V2版本：阅读进度指示器 */}
+      <ReadingProgress $progress={readingProgress} />
+      
+      {/* 文档标题 */}
+      {title && title.trim() && (
+        <DocumentTitle>{title}</DocumentTitle>
+      )}
+      
       <ContentContainer ref={contentRef}>
         <div dangerouslySetInnerHTML={{ __html: contentWithIds }} />
       </ContentContainer>
+      
+      {/* V2版本：内容导航 */}
+      {showNavigation && (
+        <ContentNavigation>
+          <div className="nav-icon">📖</div>
+          <span>阅读进度: {Math.round(readingProgress)}%</span>
+          <button 
+            onClick={scrollToTop}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginLeft: '8px'
+            }}
+            title="回到顶部"
+          >
+            ⬆️
+          </button>
+          <button 
+            onClick={scrollToBottom}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}
+            title="到底部"
+          >
+            ⬇️
+          </button>
+        </ContentNavigation>
+      )}
       
       {selectedImage && (
         <ImageViewer onClick={closeImageViewer}>
