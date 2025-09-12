@@ -118,6 +118,12 @@ const ToggleButton = styled.button`
   }
 `;
 
+const ToggleGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
 /**
  * V2版顶部导航栏组件
  * @param {object} props - 组件属性
@@ -136,7 +142,9 @@ export default function TopNavigationBar({
   onEditError,
   leftCollapsed = false,
   screenWidth = 1200,
-  onToggleLeft
+  onToggleLeft,
+  outlineOpen = true,
+  onToggleOutline
 }) {
   // 解析最后修改人信息
   const parseLastModifier = (uaid) => {
@@ -235,12 +243,20 @@ export default function TopNavigationBar({
   return (
     <TopNavContainer>
       <DocumentInfo>
-        <ToggleButton 
-          onClick={onToggleLeft}
-          title={leftCollapsed ? '展开导航栏' : '收起导航栏'}
-        >
-          {leftCollapsed ? '▶' : '◀'}
-        </ToggleButton>
+        <ToggleGroup>
+          <ToggleButton 
+            onClick={onToggleLeft}
+            title={leftCollapsed ? '展开导航栏' : '收起导航栏'}
+          >
+            {leftCollapsed ? '▶' : '◀'}
+          </ToggleButton>
+          <ToggleButton 
+            onClick={onToggleOutline}
+            title={outlineOpen ? '收起大纲' : '展开大纲'}
+          >
+            {outlineOpen ? '◀|' : '|▶'}
+          </ToggleButton>
+        </ToggleGroup>
         
         <InfoItem>
           <InfoLabel>最后修改人：</InfoLabel>

@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import styled from 'styled-components';
 import TopNavigationBar from './TopNavigationBar';
 import { generateOutline } from '../utils/dataUtils';
+import DocumentOutline from './DocumentOutline';
 
 const LayoutContainer = styled.div`
   height: 100vh;
@@ -98,65 +99,25 @@ const MainContent = styled.main`
   /* V2版：文档内容区域占据右侧大部分空间 */
   .content-wrapper {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    position: relative; /* 为悬浮大纲提供定位上下文 */
-    max-width: ${props => {
-      // 根据左侧导航栏状态和屏幕宽度计算最大宽度
-      const { $leftCollapsed, $screenWidth } = props;
-      
-      // 小屏幕：全宽显示
-      if ($screenWidth < 768) {
-        return '100%';
-      }
-      
-      // 根据左侧导航栏状态确定最大宽度
-      if ($leftCollapsed) {
-        // 左侧导航栏折叠：更大的内容区域
-        if ($screenWidth >= 1600) {
-          return '1400px';
-        } else if ($screenWidth >= 1200) {
-          return '1200px';
-        } else {
-          return '1000px';
-        }
-      } else {
-        // 左侧导航栏展开：适中的内容区域
-        if ($screenWidth >= 1600) {
-          return '1200px';
-        } else if ($screenWidth >= 1200) {
-          return '1000px';
-        } else {
-          return '800px';
-        }
-      }
+    display: grid;
+    grid-template-columns: ${props => {
+      const { $screenWidth, $outlineOpen } = props;
+      if ($screenWidth < 768) return '1fr';
+      return $outlineOpen ? '280px 1fr' : '1fr';
     }};
-    margin: 0 auto;
-    transition: max-width 0.3s ease;
-    
-    /* 为悬浮大纲预留左侧空间 */
-    @media (min-width: 1200px) {
-      margin-left: 320px; /* 为悬浮大纲预留空间 */
-    }
-    
-    @media (max-width: 1199px) and (min-width: 1025px) {
-      margin-left: 280px;
-    }
-    
-    @media (max-width: 1024px) and (min-width: 901px) {
-      margin-left: 220px;
-    }
-    
-    @media (max-width: 900px) {
-      margin-left: 0; /* 小屏幕时不需要预留空间 */
-    }
+    column-gap: 16px;
+    position: relative;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    transition: grid-template-columns 0.3s ease;
   }
   
   @media (max-width: 900px) {
     .content-wrapper {
       max-width: 100%;
       padding: 0;
-      margin-left: 50px !important; /* 小屏幕时留出50px边框安放大纲按钮 */
+      margin-left: 0 !important;
     }
     
     /* 移动端内容区域优化 */
@@ -169,7 +130,7 @@ const MainContent = styled.main`
     .content-wrapper {
       max-width: 100%;
       padding: 0;
-      margin-left: 50px !important; /* 保持50px左边距 */
+      margin-left: 0 !important;
     }
     
     /* 移动端内容区域优化 */
@@ -181,156 +142,70 @@ const MainContent = styled.main`
   /* 中等屏幕优化 */
   @media (max-width: 1200px) and (min-width: 769px) {
     .content-wrapper {
-      max-width: ${props => {
-        const { $leftCollapsed } = props;
-        return $leftCollapsed ? '1000px' : '800px';
-      }};
+      max-width: none;
     }
   }
   
   /* 大屏幕优化 */
   @media (min-width: 1201px) {
     .content-wrapper {
-      max-width: ${props => {
-        const { $leftCollapsed } = props;
-        return $leftCollapsed ? '1400px' : '1200px';
-      }};
+      max-width: none;
     }
   }
 `;
 
 
-// V2版本：移除右侧固定大纲栏，改为悬浮容器（在后续阶段实现）
+// Outline固定列（推开内容）
+const OutlineColumn = styled.aside`
+  display: ${props => (props.$visible ? 'block' : 'none')};
+  height: calc(100vh - 60px);
+  position: sticky;
+  top: 60px;
+  overflow-y: auto;
+  border-right: 1px solid #e8e8e8;
+  background:rgb(255, 255, 255);
+  padding: 0;
+  opacity: ${props => (props.$visible ? 1 : 0)};
+  transform: ${props => (props.$visible ? 'translateX(0)' : 'translateX(-20px)')};
+  transition: opacity 0.3s ease, transform 0.3s ease;
+`;
 
-// V2版本：移除EdgeToggleButton，切换功能移至顶部导航栏
-
-// V2版本：悬浮大纲组件样式 - 玻璃质感设计
-const FloatingOutline = styled.div`
+// 小屏覆盖式大纲
+const OutlineOverlay = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: block;
+  }
   position: fixed;
-  left: ${props => `${props.$dynamicLeft}px`};
-  top: ${props => `${props.$dynamicTop}px`};
+  left: 0;
+  top: 60px; /* 不覆盖顶部导航栏 */
+  height: calc(100vh - 60px);
   width: 280px;
-  max-height: calc(100vh - 100px); /* 限制最大高度，避免超出视窗 */
-  
-  /* 玻璃质感背景 */
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  
-  /* 边框和阴影 */
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 16px;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.12),
-    0 2px 6px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  
-  z-index: 1000;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  
-  /* 收起状态 - 玻璃质感按钮 */
-  ${props => props.$collapsed && `
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 50%;
-    left: ${props => `${props.$dynamicLeft}px`};
-    top: ${props => `${props.$dynamicTop}px`};
-    max-height: none;
-    cursor: pointer;
-    
-    /* 收起时的玻璃质感 */
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 
-      0 4px 16px rgba(0, 0, 0, 0.1),
-      0 1px 3px rgba(0, 0, 0, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    
-    &:hover {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px) saturate(200%);
-      -webkit-backdrop-filter: blur(20px) saturate(200%);
-      box-shadow: 
-        0 8px 24px rgba(0, 0, 0, 0.15),
-        0 2px 6px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 1);
-      transform: scale(1.05);
-    }
-  `}
-  
-  /* 响应式设计 - 当屏幕缩小时自动收缩（仅对展开状态生效） */
-  ${props => !props.$collapsed && `
-    @media (max-width: 1200px) {
-      width: 240px;
-    }
-    
-    @media (max-width: 1024px) {
-      width: 180px;
-    }
-  `}
-  
-  /* 小屏幕时自动收起成按钮，使用动态位置 - 玻璃质感 */
-  @media (max-width: 900px) {
-    width: 24px !important;
-    height: 24px !important;
-    border-radius: 8px;
-    left: ${props => `${props.$dynamicLeft}px`} !important;
-    top: ${props => `${props.$dynamicTop}px`} !important;
-    max-height: none;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    /* 小按钮的玻璃质感 */
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      0 1px 3px rgba(0, 0, 0, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.7);
-    
-    /* 悬停时显示完整大纲 */
-    &:hover {
-      width: 280px !important;
-      height: auto !important;
-      border-radius: 16px;
-      max-height: calc(100vh - 100px);
-      
-      /* 展开时的增强玻璃质感 */
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      box-shadow: 
-        0 8px 32px rgba(0, 0, 0, 0.12),
-        0 2px 6px rgba(0, 0, 0, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      
-      /* 悬停时显示内容 */
-      .outline-content {
-        display: block;
-      }
-      
-      /* 悬停时隐藏按钮图标 */
-      > div:first-child {
-        display: none;
-      }
-    }
-    
-    /* 默认隐藏内容，只显示按钮 */
-    .outline-content {
-      display: none;
-    }
+  z-index: 1002;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(0,0,0,0.06);
+  transform: translateX(${props => (props.$open ? '0' : '-100%')});
+  opacity: ${props => (props.$open ? 1 : 0)};
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  overflow-y: auto;
+`;
+
+// 小屏大纲遮罩，点击关闭
+const OutlineBackdrop = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: ${props => (props.$show ? 'block' : 'none')};
   }
-  
-  /* 移动端隐藏大纲按钮 */
-  @media (max-width: 768px) {
-    display: none !important;
-  }
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1001; /* 低于OutlineOverlay，高于内容 */
+  background: rgba(0, 0, 0, 0); /* 不额外加暗，以免干扰视觉 */
 `;
 
 const FloatingOutlineHeader = styled.div`
@@ -593,11 +468,10 @@ export default function Layout({
   // 移动端导航栏状态
   const [mobileNavCollapsed, setMobileNavCollapsed] = useState(true);
   
-  // 悬浮大纲状态
-  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
+  // 大纲开关
+  const [outlineOpen, setOutlineOpen] = useState(true);
   const [outline, setOutline] = useState([]);
   const [activeHeadingId, setActiveHeadingId] = useState('');
-  const [outlinePosition, setOutlinePosition] = useState({ left: 20, top: 20 });
   
   const leftSidebarRef = useRef(null);
   // V2版本：移除leftButtonRef，不再需要
@@ -700,13 +574,8 @@ export default function Layout({
   
   // 根据屏幕宽度自动收起大纲和移动端导航栏
   useEffect(() => {
-    // 当屏幕宽度小于900px时自动收起大纲，显示为按钮
-    if (screenWidth <= 900) {
-      setOutlineCollapsed(true);
-    } else {
-      // 大屏幕时保持展开状态
-      setOutlineCollapsed(false);
-    }
+    if (screenWidth < 768) setOutlineOpen(false);
+    else setOutlineOpen(true);
     
     // 移动端自动收起导航栏
     if (screenWidth <= 768) {
@@ -714,78 +583,7 @@ export default function Layout({
     }
   }, [screenWidth]);
 
-  // 动态计算大纲按钮位置
-  const calculateOutlinePosition = useCallback(() => {
-    const leftNavElement = document.querySelector('.sc-hwkwBN.vVqyi');
-    const topNavElement = document.querySelector('.sc-bRKDuR.brlhrh');
-    
-    let leftNavWidth = 0;
-    let topNavHeight = 0;
-    
-    // 计算左侧导航栏宽度
-    if (leftNavElement) {
-      leftNavWidth = leftNavElement.offsetWidth;
-    } else {
-      // 如果找不到元素，根据屏幕宽度和折叠状态估算
-      if (!leftCollapsed) {
-        if (screenWidth >= 1600) {
-          leftNavWidth = 280;
-        } else if (screenWidth >= 1200) {
-          leftNavWidth = 250;
-        } else if (screenWidth >= 768) {
-          leftNavWidth = 200;
-        } else {
-          leftNavWidth = 0;
-        }
-      }
-    }
-    
-    // 计算顶部导航栏高度
-    if (topNavElement) {
-      topNavHeight = topNavElement.offsetHeight;
-    } else {
-      // 如果找不到元素，使用默认高度估算
-      topNavHeight = 60; // 默认顶部导航栏高度
-    }
-    
-    const newPosition = {
-      left: leftNavWidth + 10,
-      top: topNavHeight + 10
-    };
-    
-    setOutlinePosition(newPosition);
-    return newPosition;
-  }, [leftCollapsed, screenWidth]);
-
-  // 监听窗口大小变化，重新计算位置（移除延迟）
-  useEffect(() => {
-    const handleResize = () => {
-      setScreenWidth(window.innerWidth);
-      // 使用requestAnimationFrame确保在同一帧内更新位置
-      window.requestAnimationFrame(() => {
-        calculateOutlinePosition();
-      });
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [calculateOutlinePosition]);
-
-  // 组件挂载时计算初始位置（移除延迟）
-  useEffect(() => {
-    // 下一个动画帧立即计算，避免500ms延迟
-    const rafId = window.requestAnimationFrame(() => {
-      calculateOutlinePosition();
-    });
-    return () => window.cancelAnimationFrame(rafId);
-  }, [calculateOutlinePosition]);
-
-  // 左侧折叠状态变化时立即重新计算位置
-  useEffect(() => {
-    window.requestAnimationFrame(() => {
-      calculateOutlinePosition();
-    });
-  }, [leftCollapsed, calculateOutlinePosition]);
+  // 删除悬浮大纲相关位置计算逻辑
   
   // 触摸交互优化
   useEffect(() => {
@@ -842,8 +640,8 @@ export default function Layout({
   
   // 处理悬浮大纲切换
   const handleOutlineToggle = useCallback(() => {
-    setOutlineCollapsed(!outlineCollapsed);
-  }, [outlineCollapsed]);
+    setOutlineOpen(prev => !prev);
+  }, []);
 
   // 处理移动端遮罩点击
   const handleMobileBackdropClick = useCallback(() => {
@@ -970,6 +768,7 @@ export default function Layout({
       <MainContent 
         $leftCollapsed={leftCollapsed}
         $screenWidth={screenWidth}
+        $outlineOpen={outlineOpen}
       >
         {/* V2版本：顶部导航栏直接放在MainContent下，不受content-wrapper宽度限制 */}
               <TopNavigationBar
@@ -980,87 +779,38 @@ export default function Layout({
                 leftCollapsed={leftCollapsed}
                 screenWidth={screenWidth}
                 onToggleLeft={handleLeftToggleClick}
+                outlineOpen={outlineOpen}
+                onToggleOutline={handleOutlineToggle}
               />
         
         <div className="content-wrapper">
+          {/* 大/中屏：固定列推开内容 */}
+          <OutlineColumn $visible={screenWidth >= 768 && outlineOpen}>
+            {rightSidebar || (
+              <DocumentOutline
+                content={currentDocument?.content}
+                onHeadingChange={(id) => setActiveHeadingId(id)}
+              />
+            )}
+          </OutlineColumn>
           <div style={{ padding: '20px', flex: 1 }}>
             {mainContent}
           </div>
         </div>
       </MainContent>
-      
-      {/* V2版：悬浮大纲组件 - 固定在视窗中，不受滚动影响 */}
-      <FloatingOutline
-        $collapsed={outlineCollapsed}
-        $screenWidth={screenWidth}
-        $leftCollapsed={leftCollapsed}
-        $dynamicLeft={outlinePosition.left}
-        $dynamicTop={outlinePosition.top}
-        onClick={outlineCollapsed && screenWidth > 900 ? handleOutlineToggle : undefined}
-        className="touch-feedback"
-      >
-        {outlineCollapsed ? (
-          <>
-            <CollapsedIcon>
-              📋
-            </CollapsedIcon>
-            {/* 小屏幕时也渲染内容，但通过CSS隐藏 */}
-            {screenWidth <= 900 && (
-              <div className="outline-content">
-                <FloatingOutlineHeader>
-                  <h3 className="outline-title">大纲</h3>
-                  <button 
-                    className="toggle-button"
-                    onClick={handleOutlineToggle}
-                    title="收起大纲"
-                  >
-                    ×
-                  </button>
-                </FloatingOutlineHeader>
-                
-                <FloatingOutlineContent>
-                  {outline.length === 0 ? (
-                    <EmptyState>
-                      <div className="empty-icon">📋</div>
-                      <div>暂无大纲</div>
-                    </EmptyState>
-                  ) : (
-                    <OutlineList>
-                      {memoizedOutline}
-                    </OutlineList>
-                  )}
-                </FloatingOutlineContent>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="outline-content">
-            <FloatingOutlineHeader>
-              <h3 className="outline-title">大纲</h3>
-              <button 
-                className="toggle-button"
-                onClick={handleOutlineToggle}
-                title="收起大纲"
-              >
-                ×
-              </button>
-            </FloatingOutlineHeader>
-            
-            <FloatingOutlineContent>
-              {outline.length === 0 ? (
-                <EmptyState>
-                  <div className="empty-icon">📋</div>
-                  <div>暂无大纲</div>
-                </EmptyState>
-              ) : (
-                <OutlineList>
-                  {memoizedOutline}
-                </OutlineList>
-              )}
-            </FloatingOutlineContent>
-          </div>
+      {/* 小屏覆盖式大纲 + 点击外部关闭遮罩 */}
+      <OutlineBackdrop 
+        $show={screenWidth < 768 && outlineOpen}
+        onClick={() => setOutlineOpen(false)}
+      />
+      <OutlineOverlay $open={screenWidth < 768 && outlineOpen}>
+        {rightSidebar || (
+          <DocumentOutline
+            content={currentDocument?.content}
+            onHeadingChange={(id) => setActiveHeadingId(id)}
+          />
         )}
-      </FloatingOutline>
+      </OutlineOverlay>
       
     </LayoutContainer>
   );
