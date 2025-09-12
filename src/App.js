@@ -2,11 +2,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import { env, config, api } from "mdye";
 import Layout from "./components/Layout";
 import TreeNavigation from "./components/TreeNavigation";
+import RelationTreeNavigation from "./components/RelationTreeNavigation";
 import RichTextRenderer from "./components/RichTextRenderer";
 import DocumentOutline from "./components/DocumentOutline";
 import SearchBar from "./components/SearchBar";
 import SettingsPanel from "./components/SettingsPanel";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ChildDocumentsTable from "./components/ChildDocumentsTable";
 import { fetchDocuments, buildDocumentCategories } from "./utils/dataUtils";
 import { getReadingStats } from "./utils/readingProgress";
 import { initializePlugin, startPlugin, getPluginState } from "./utils/pluginLifecycle";
@@ -72,6 +74,10 @@ export default function App() {
   const [configSummary, setConfigSummary] = useState(null);
   const [availableFields, setAvailableFields] = useState([]);
   
+  // 关联记录树状导航相关状态
+  const [useRelationTree, setUseRelationTree] = useState(false);
+  const [relationTreeData, setRelationTreeData] = useState(null);
+  
   // 添加调试信息
   console.log('App组件渲染，当前状态:', {
     documentsCount: documents.length,
@@ -95,13 +101,45 @@ export default function App() {
       
       setDocuments(docs);
       
-      // 构建分类结构
+      // 检查是否使用关联记录树状结构
+      const parentFieldId = env.parent_id?.[0];
+      const childrenFieldId = env.children?.[0];
       const categoryFieldId = env.category?.[0];
-      if (categoryFieldId && docs.length > 0) {
+      
+      console.log('字段配置检查:', {
+        parentFieldId,
+        childrenFieldId,
+        categoryFieldId,
+        hasParentField: !!parentFieldId,
+        hasChildrenField: !!childrenFieldId
+      });
+      
+      // 优先使用关联记录树状结构
+      if (parentFieldId && childrenFieldId && docs.length > 0) {
+        console.log('使用关联记录树状结构');
+        setUseRelationTree(true);
+        
+        // 构建关联记录树状结构
+        const { buildRelationTree } = await import('./utils/dataUtils');
+        const treeData = buildRelationTree(docs, parentFieldId, childrenFieldId);
+        setRelationTreeData(treeData);
+        
+        // 清空传统分类结构
+        setCategories({});
+      } else if (categoryFieldId && docs.length > 0) {
+        console.log('使用传统级联选择分类结构');
+        setUseRelationTree(false);
+        
         const cats = buildDocumentCategories(docs, categoryFieldId);
         console.log('构建的分类结构:', cats);
         setCategories(cats);
+        
+        // 清空关联记录树状结构
+        setRelationTreeData(null);
       } else {
+        console.log('使用默认文档列表');
+        setUseRelationTree(false);
+        
         // 如果没有分类字段，将所有文档放到"所有文档"分类中
         setCategories({
           '所有文档': {
@@ -109,6 +147,9 @@ export default function App() {
             documents: docs
           }
         });
+        
+        // 清空关联记录树状结构
+        setRelationTreeData(null);
       }
       
       // 默认选择第一个文档
@@ -284,22 +325,42 @@ export default function App() {
         onSelectDocument={handleSearchDocumentSelect}
         placeholder="搜索文档..."
       />
-      <TreeNavigation
-        categories={categories}
-        onDocumentSelect={handleDocumentSelect}
-        selectedDocumentId={selectedDocument?.id}
-      />
+      {useRelationTree ? (
+        <RelationTreeNavigation
+          documents={documents}
+          onDocumentSelect={handleDocumentSelect}
+          selectedDocumentId={selectedDocument?.id}
+          api={api}
+          config={config}
+          parentFieldId={env.parent_id?.[0]}
+          childrenFieldId={env.children?.[0]}
+        />
+      ) : (
+        <TreeNavigation
+          categories={categories}
+          onDocumentSelect={handleDocumentSelect}
+          selectedDocumentId={selectedDocument?.id}
+        />
+      )}
     </div>
   );
   
   // 渲染主内容区
   const renderMainContent = () => (
-    <RichTextRenderer
-      content={selectedDocument?.content}
-      title={selectedDocument?.title}
-      documentId={selectedDocument?.id}
-      onContentChange={handleContentChange}
-    />
+    <div>
+      <RichTextRenderer
+        content={selectedDocument?.content}
+        title={selectedDocument?.title}
+        documentId={selectedDocument?.id}
+        onContentChange={handleContentChange}
+      />
+      {/* 子级文档表格 */}
+      <ChildDocumentsTable
+        currentDocumentId={selectedDocument?.id}
+        onDocumentSelect={handleDocumentSelect}
+        visible={!!selectedDocument}
+      />
+    </div>
   );
   
   // 渲染右侧大纲

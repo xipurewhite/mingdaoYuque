@@ -243,6 +243,22 @@ class EnvHandler {
   }
   
   /**
+   * 获取关联记录字段
+   * @returns {Array} 关联记录字段数组
+   */
+  getRelationFields() {
+    return this.getFieldsByType(29);
+  }
+  
+  /**
+   * 获取关联记录字段（类型编号50）
+   * @returns {Array} 关联记录字段数组
+   */
+  getRelationRecordFields() {
+    return this.getFieldsByType(50);
+  }
+  
+  /**
    * 获取单选字段
    * @returns {Array} 单选字段数组
    */
@@ -330,6 +346,33 @@ class EnvHandler {
       errors.push('缺少环境变量配置');
     }
     
+    // 检查关联记录字段配置
+    const parentFieldId = this.getEnvValue('parent_id');
+    const childrenFieldId = this.getEnvValue('children');
+    
+    if (parentFieldId && !this.hasField(parentFieldId)) {
+      errors.push(`父级关联记录字段不存在: ${parentFieldId}`);
+    }
+    
+    if (childrenFieldId && !this.hasField(childrenFieldId)) {
+      errors.push(`子级关联记录字段不存在: ${childrenFieldId}`);
+    }
+    
+    // 检查字段类型
+    if (parentFieldId) {
+      const parentFieldType = this.getFieldType(parentFieldId);
+      if (parentFieldType !== 29 && parentFieldType !== 50) {
+        warnings.push(`父级字段类型可能不正确，期望关联记录字段(29或50)，实际: ${parentFieldType}`);
+      }
+    }
+    
+    if (childrenFieldId) {
+      const childrenFieldType = this.getFieldType(childrenFieldId);
+      if (childrenFieldType !== 29 && childrenFieldType !== 50) {
+        warnings.push(`子级字段类型可能不正确，期望关联记录字段(29或50)，实际: ${childrenFieldType}`);
+      }
+    }
+    
     return {
       valid: errors.length === 0,
       errors,
@@ -353,7 +396,12 @@ class EnvHandler {
       richTextFieldsCount: this.getRichTextFields().length,
       selectFieldsCount: this.getSelectFields().length,
       dateFieldsCount: this.getDateFields().length,
-      userFieldsCount: this.getUserFields().length
+      userFieldsCount: this.getUserFields().length,
+      relationFieldsCount: this.getRelationFields().length,
+      relationRecordFieldsCount: this.getRelationRecordFields().length,
+      parentFieldId: this.getEnvValue('parent_id'),
+      childrenFieldId: this.getEnvValue('children'),
+      hasRelationTree: !!(this.getEnvValue('parent_id') && this.getEnvValue('children'))
     };
   }
   
