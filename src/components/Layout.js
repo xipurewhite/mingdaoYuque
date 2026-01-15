@@ -13,16 +13,20 @@ const LayoutContainer = styled.div`
   height: 100vh;
   display: grid;
   grid-template-columns: ${props => {
+    // 外部分享模式：强制单列
+    if (props.$isExternalMode) return '1fr';
+    
     // V2版布局：左侧导航栏 + 右侧内容区域
     const leftWidth = props.$leftCollapsed ? '0' : 
-      (props.$screenWidth >= 1600 ? '280px' : 
-       props.$screenWidth >= 1200 ? '250px' : 
-       props.$screenWidth >= 768 ? '200px' : '0');
+      (props.$screenWidth >= 1600 ? '320px' : 
+       props.$screenWidth >= 1200 ? '290px' : 
+       props.$screenWidth >= 768 ? '240px' : '0');
     return `${leftWidth} 1fr`;
   }};
   background: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   transition: grid-template-columns 0.3s ease;
+  gap: 0;
   
   /* 响应式优化 */
   @media (max-width: 768px) {
@@ -37,6 +41,8 @@ const Sidebar = styled.aside`
   overflow-y: auto;
   transition: all 0.3s ease;
   position: relative;
+  padding: 0;
+  margin: 0;
   
   &.collapsed {
     width: 0;
@@ -50,7 +56,7 @@ const Sidebar = styled.aside`
     position: fixed;
     top: 0;
     left: 0;
-    width: 280px;
+    width: 320px;
     height: 100vh;
     z-index: 1002; /* 确保在其他内容之上 */
     border-right: none;
@@ -60,12 +66,13 @@ const Sidebar = styled.aside`
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     
     &.collapsed {
-      width: 280px; /* 移动端不使用width收起，使用transform */
-      min-width: 280px;
+      width: 320px; /* 移动端不使用width收起，使用transform */
+      min-width: 320px;
       overflow: visible;
     }
   }
 `;
+
 
 // 移动端遮罩层
 const MobileBackdrop = styled.div`
@@ -89,12 +96,18 @@ const MobileBackdrop = styled.div`
 const MainContent = styled.main`
   background: #ffffff;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0;
+  margin: 0;
   line-height: 1.6;
   width: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
+  /* 防止整个MainContent横向滚动，确保顶部导航栏固定 */
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: 0 20px 20px 0;
   
   /* V2版：文档内容区域占据右侧大部分空间 */
   .content-wrapper {
@@ -103,14 +116,43 @@ const MainContent = styled.main`
     grid-template-columns: ${props => {
       const { $screenWidth, $outlineOpen } = props;
       if ($screenWidth < 768) return '1fr';
-      return $outlineOpen ? '280px 1fr' : '1fr';
+      return $outlineOpen ? '240px 1fr' : '1fr';
     }};
-    column-gap: 16px;
+    column-gap: 0;
     position: relative;
     width: 100%;
-    max-width: none;
+    max-width: 100%;
     margin: 0;
+    padding: 0;
     transition: grid-template-columns 0.3s ease;
+    /* 防止content-wrapper本身横向滚动 */
+    overflow-x: hidden;
+    overflow-y: visible;
+    min-width: 0;
+    box-sizing: border-box;
+    
+    /* 防止网格子项在小屏超宽：允许右侧内容列收缩 */
+    > div:last-child {
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: visible;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+    }
+    
+    /* 大纲列固定宽度，不受横向滚动影响 */
+    > div:first-child {
+      flex-shrink: 0;
+      min-width: 240px;
+      max-width: 240px;
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+    }
   }
   
   @media (max-width: 900px) {
@@ -158,16 +200,24 @@ const MainContent = styled.main`
 // Outline固定列（推开内容）
 const OutlineColumn = styled.aside`
   display: ${props => (props.$visible ? 'block' : 'none')};
-  height: calc(100vh - 60px);
+  height: calc(100vh - 40px);
   position: sticky;
-  top: 60px;
+  top: 40px;
   overflow-y: auto;
+  overflow-x: hidden;
   border-right: 1px solid #e8e8e8;
   background:rgb(255, 255, 255);
   padding: 0;
+  margin: 0;
+  width: 240px;
+  flex-shrink: 0;
   opacity: ${props => (props.$visible ? 1 : 0)};
   transform: ${props => (props.$visible ? 'translateX(0)' : 'translateX(-20px)')};
   transition: opacity 0.3s ease, transform 0.3s ease;
+  /* 确保大纲区域不受横向滚动影响，固定在视口右侧 */
+  z-index: 10;
+  will-change: transform;
+  backface-visibility: hidden;
 `;
 
 // 小屏覆盖式大纲
@@ -178,9 +228,9 @@ const OutlineOverlay = styled.div`
   }
   position: fixed;
   left: 0;
-  top: 60px; /* 不覆盖顶部导航栏 */
-  height: calc(100vh - 60px);
-  width: 280px;
+  top: 40px; /* 不覆盖顶部导航栏 */
+  height: calc(100vh - 40px);
+  width: 240px;
   z-index: 1002;
   background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(12px);
@@ -254,7 +304,7 @@ const FloatingOutlineHeader = styled.div`
 
 const FloatingOutlineContent = styled.div`
   padding: 8px 0;
-  max-height: calc(70vh - 60px);
+  max-height: calc(70vh - 40px);
   overflow-y: auto;
   
   /* 自定义滚动条 */
@@ -288,6 +338,9 @@ const OutlineItem = styled.li`
   border-radius: 4px;
   transition: all 0.2s;
   padding: 6px 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   &.level-1 {
     font-weight: 500;
@@ -318,6 +371,11 @@ const OutlineItem = styled.li`
     background-color: #e6f7ff;
     color: #1890ff;
     font-weight: 500;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-wrap: break-word;
+    word-break: break-word;
   }
 `;
 
@@ -458,7 +516,9 @@ export default function Layout({
   currentDocument = null,
   config = null,
   onEditSuccess = null,
-  onEditError = null
+  onEditError = null,
+  onDeleteSuccess = null,
+  isExternalMode = false
 }) {
   // V2版：状态管理
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -742,6 +802,7 @@ export default function Layout({
     <LayoutContainer 
       $leftCollapsed={leftCollapsed}
       $screenWidth={screenWidth}
+      $isExternalMode={isExternalMode}
     >
       {loading && (
         <LoadingOverlay>
@@ -752,18 +813,22 @@ export default function Layout({
       {/* V2版本：移除EdgeToggleButton，切换功能移至顶部导航栏 */}
       
       {/* 移动端遮罩层 */}
-      <MobileBackdrop 
-        $show={screenWidth <= 768 && !mobileNavCollapsed}
-        onClick={handleMobileBackdropClick}
-      />
+      {!isExternalMode && (
+        <MobileBackdrop 
+          $show={screenWidth <= 768 && !mobileNavCollapsed}
+          onClick={handleMobileBackdropClick}
+        />
+      )}
       
-      <Sidebar 
-        ref={leftSidebarRef}
-        className={leftCollapsed ? 'collapsed' : ''}
-        $mobileCollapsed={mobileNavCollapsed}
-      >
-        {leftSidebar}
-      </Sidebar>
+      {!isExternalMode && (
+        <Sidebar 
+          ref={leftSidebarRef}
+          className={leftCollapsed ? 'collapsed' : ''}
+          $mobileCollapsed={mobileNavCollapsed}
+        >
+          {leftSidebar}
+        </Sidebar>
+      )}
       
       <MainContent 
         $leftCollapsed={leftCollapsed}
@@ -776,10 +841,12 @@ export default function Layout({
                 config={config}
                 onEditSuccess={onEditSuccess}
                 onEditError={onEditError}
+                onDeleteSuccess={onDeleteSuccess}
                 leftCollapsed={leftCollapsed}
                 screenWidth={screenWidth}
-                onToggleLeft={handleLeftToggleClick}
+                isExternalMode={isExternalMode}
                 outlineOpen={outlineOpen}
+                onToggleLeft={handleLeftToggleClick}
                 onToggleOutline={handleOutlineToggle}
               />
         
@@ -793,7 +860,17 @@ export default function Layout({
               />
             )}
           </OutlineColumn>
-          <div style={{ padding: '20px', flex: 1 }}>
+          <div style={{ 
+            padding: '0', 
+            margin: '0',
+            flex: 1, 
+            minWidth: 0,
+            overflowX: 'auto',
+            overflowY: 'visible',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
+            maxWidth: '100%'
+          }}>
             {mainContent}
           </div>
         </div>

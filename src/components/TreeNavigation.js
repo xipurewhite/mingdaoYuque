@@ -6,13 +6,12 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 
 const TreeContainer = styled.div`
-  padding: 16px;
-  height: 100%;
-  overflow-y: auto;
+  padding: 12px 16px;
+  margin: 0;
   
   /* V2版本：响应式优化 */
   @media (max-width: 768px) {
-    padding: 12px;
+    padding: 10px 12px;
     font-size: 14px;
   }
   
@@ -43,11 +42,13 @@ const TreeNode = styled.div`
 const NodeHeader = styled.div`
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 6px 12px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 4px;
   transition: all 0.2s ease;
-  min-height: 44px; /* V2版本：触摸友好 */
+  min-height: 28px;
+  line-height: 1.4;
+  min-width: 0; /* 允许flex子元素收缩 */
   
   &:hover {
     background-color: #f0f0f0;
@@ -58,6 +59,7 @@ const NodeHeader = styled.div`
     background-color: #e6f7ff;
     color: #1890ff;
     font-weight: 500;
+    align-items: flex-start;
   }
   
   /* V2版本：触摸反馈 */
@@ -66,8 +68,8 @@ const NodeHeader = styled.div`
   }
   
   @media (max-width: 768px) {
-    padding: 12px;
-    min-height: 48px;
+    padding: 8px 12px;
+    min-height: 32px;
   }
 `;
 
@@ -76,6 +78,8 @@ const ExpandIcon = styled.span`
   font-size: 12px;
   color: #666;
   transition: transform 0.2s;
+  flex-shrink: 0;
+  margin-top: 2px; /* 选中状态下图标顶部对齐 */
   
   &.expanded {
     transform: rotate(90deg);
@@ -85,41 +89,54 @@ const ExpandIcon = styled.span`
 const NodeTitle = styled.span`
   font-size: 14px;
   color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
   
   .active & {
     color: #1890ff;
     font-weight: 500;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-wrap: break-word;
+    word-break: break-word;
   }
 `;
 
 const NodeChildren = styled.div`
-  margin-left: 20px;
-  border-left: 2px solid #e8e8e8;
+  margin-left: 16px;
+  border-left: 1px solid #e8e8e8;
   padding-left: 12px;
-  margin-top: 4px;
+  margin-top: 2px;
   
   /* V2版本：优化层级显示 */
   ${TreeNode} {
-    margin-bottom: 2px;
+    margin-bottom: 4px;
   }
   
   /* 嵌套层级样式 */
   ${NodeChildren} {
     border-left-color: #d0d0d0;
-    margin-left: 16px;
+    margin-left: 14px;
   }
 `;
 
 const DocumentItem = styled.div`
-  padding: 8px 12px;
+  padding: 6px 12px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 13px;
   color: #666;
   transition: all 0.2s ease;
-  min-height: 40px; /* V2版本：触摸友好 */
+  min-height: 28px;
+  line-height: 1.4;
   display: flex;
   align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
   
   &:hover {
     background-color: #f0f0f0;
@@ -132,6 +149,9 @@ const DocumentItem = styled.div`
     color: #1890ff;
     font-weight: 500;
     border-left: 3px solid #1890ff;
+    white-space: normal;
+    overflow: visible;
+    align-items: flex-start;
   }
   
   /* V2版本：触摸反馈 */
@@ -142,6 +162,26 @@ const DocumentItem = styled.div`
   .document-icon {
     margin-right: 8px;
     font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px; /* 选中状态下图标顶部对齐 */
+  }
+  
+  /* 文档标题文本样式 */
+  > span:not(.document-icon) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+  }
+  
+  /* 选中状态下，文档标题允许多行显示 */
+  &.active > span:not(.document-icon) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-wrap: break-word;
+    word-break: break-word;
   }
   
   @media (max-width: 768px) {
@@ -188,13 +228,18 @@ function TreeNodeComponent({
     onDocumentSelect(doc);
   };
   
+  // 判断是否应该显示展开/收缩按钮
+  // 1. 如果节点有子节点或文档（canExpand），显示按钮
+  // 2. 如果节点已经展开（isExpanded），也应该显示收缩按钮，即使 canExpand 为 false（比如子节点被删除的情况）
+  const shouldShowExpandButton = canExpand || isExpanded;
+  
   return (
     <TreeNode>
       <NodeHeader 
-        onClick={handleToggle}
+        onClick={shouldShowExpandButton ? handleToggle : undefined}
         className={!canExpand ? 'active' : ''}
       >
-        {canExpand && (
+        {shouldShowExpandButton && (
           <ExpandIcon className={isExpanded ? 'expanded' : ''}>
             ▶
           </ExpandIcon>
@@ -221,9 +266,10 @@ function TreeNodeComponent({
               key={doc.id}
               className={selectedDocumentId === doc.id ? 'active' : ''}
               onClick={() => handleDocumentClick(doc)}
+              title={doc.title}
             >
               <span className="document-icon">📄</span>
-              {doc.title}
+              <span>{doc.title}</span>
             </DocumentItem>
           ))}
         </NodeChildren>

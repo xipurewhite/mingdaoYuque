@@ -6,8 +6,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 
 const SearchContainer = styled.div`
-  position: relative;
-  margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fafafa;
+  padding: 12px 16px;
+  margin: 0;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
 `;
 
 const SearchInput = styled.input`
@@ -31,7 +38,7 @@ const SearchInput = styled.input`
 
 const SearchIcon = styled.div`
   position: absolute;
-  left: 12px;
+  left: 27px;
   top: 50%;
   transform: translateY(-50%);
   color: #bfbfbf;

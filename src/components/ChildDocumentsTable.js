@@ -157,6 +157,7 @@ export default function ChildDocumentsTable({
   const [childDocuments, setChildDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingDocumentId, setLoadingDocumentId] = useState(null);
 
   // 获取子级文档数据
   const fetchChildDocuments = useCallback(async (documentId) => {
@@ -234,13 +235,101 @@ export default function ChildDocumentsTable({
   }, [currentDocumentId, visible, fetchChildDocuments]);
 
   // 处理文档选择
-  const handleDocumentClick = useCallback((document) => {
-    if (onDocumentSelect) {
+  const handleDocumentClick = useCallback(async (document) => {
+    if (!onDocumentSelect) return;
+    
+    // 如果content为空或只包含空白字符，需要获取完整文档详情
+    if (!document.content || !document.content.trim()) {
+      setLoadingDocumentId(document.id);
+      try {
+        console.log('子文档内容为空，开始获取完整文档详情:', document.id);
+        
+        // 使用getRowDetail获取完整文档信息
+        const result = await api.getRowDetail({
+          appId: config.appId,
+          worksheetId: config.worksheetId,
+          viewId: config.viewId,
+          rowId: document.id,
+          getTemplate: false
+        });
+
+        console.log('getRowDetail API调用结果:', result);
+
+        // 处理不同的返回数据格式
+        let updatedRecord = null;
+        if (result && result.data) {
+          // 标准格式：result.data
+          updatedRecord = result.data;
+        } else if (result && result.rowData) {
+          // 新格式：result.rowData 是JSON字符串
+          try {
+            updatedRecord = JSON.parse(result.rowData);
+            console.log('解析rowData成功:', updatedRecord);
+          } catch (parseError) {
+            console.error('解析rowData失败:', parseError);
+            throw new Error('无法解析返回的数据格式');
+          }
+        } else {
+          console.warn('getRowDetail返回的数据格式不正确:', result);
+          throw new Error('API返回数据格式不正确');
+        }
+
+        if (updatedRecord) {
+          // 获取字段ID配置
+          const titleFieldId = getEnvValue('titleFieldId');
+          const contentFieldId = getEnvValue('contentFieldId');
+          
+          console.log('字段ID配置:', { titleFieldId, contentFieldId });
+          
+          // 构建完整的文档对象
+          const fullDocument = {
+            id: updatedRecord.rowid || document.id,
+            title: (titleFieldId && updatedRecord[titleFieldId]) || document.title || '无标题',
+            content: (contentFieldId && updatedRecord[contentFieldId]) || '',
+            uaid: updatedRecord.uaid || document.rawRecord?.uaid,
+            utime: updatedRecord.utime || document.updateTime,
+            rawRecord: updatedRecord,
+            category: null,
+            createTime: updatedRecord.ctime || document.rawRecord?.ctime || '',
+            updateTime: updatedRecord.utime || document.updateTime,
+            creator: '未知'
+          };
+          
+          console.log('获取到完整文档详情:', fullDocument);
+          console.log('内容长度:', fullDocument.content?.length || 0);
+          
+          onDocumentSelect(fullDocument);
+          setLoadingDocumentId(null);
+          return;
+        } else {
+          throw new Error('无法获取文档详情数据');
+        }
+      } catch (error) {
+        console.error('获取文档详情失败:', error);
+        setLoadingDocumentId(null);
+        // 即使获取失败，也使用原有数据，至少可以显示标题
+        // 构建文档对象（可能没有content）
+        const fullDocument = {
+          id: document.id,
+          title: document.title,
+          content: document.content || '',
+          uaid: document.rawRecord?.uaid,
+          utime: document.rawRecord?.utime,
+          rawRecord: document.rawRecord,
+          category: null,
+          createTime: document.rawRecord?.ctime || '',
+          updateTime: document.updateTime,
+          creator: '未知'
+        };
+        onDocumentSelect(fullDocument);
+      }
+    } else {
+      // 如果content存在，直接使用原有数据
       // 构建完整的文档对象，包含系统字段
       const fullDocument = {
         id: document.id,
         title: document.title,
-        content: document.content,
+        content: document.content || '',
         uaid: document.rawRecord?.uaid,
         utime: document.rawRecord?.utime,
         rawRecord: document.rawRecord,
@@ -317,9 +406,21 @@ export default function ChildDocumentsTable({
               <TableRow 
                 key={doc.id} 
                 onClick={() => handleDocumentClick(doc)}
+                style={{ opacity: loadingDocumentId === doc.id ? 0.6 : 1 }}
               >
                 <TableCell>
-                  <DocumentTitle>{doc.title}</DocumentTitle>
+                  <DocumentTitle>
+                    {doc.title}
+                    {loadingDocumentId === doc.id && (
+                      <LoadingSpinner style={{ 
+                        display: 'inline-block', 
+                        width: '12px', 
+                        height: '12px', 
+                        marginLeft: '8px',
+                        marginRight: 0
+                      }} />
+                    )}
+                  </DocumentTitle>
                 </TableCell>
                 <TableCell>
                   {formatTime(doc.updateTime)}

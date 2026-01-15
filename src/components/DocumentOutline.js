@@ -8,8 +8,14 @@ import { generateOutline } from '../utils/dataUtils';
 
 const OutlineContainer = styled.div`
   padding: 16px;
+  margin: 0;
   height: 100%;
   overflow-y: auto;
+  
+  /* 响应式间距 */
+  @media (max-width: 768px) {
+    padding: 12px;
+  }
 `;
 
 const OutlineTitle = styled.h3`
@@ -28,41 +34,46 @@ const OutlineList = styled.ul`
 `;
 
 const OutlineItem = styled.li`
-  margin: 4px 0;
+  margin: 2px 0;
+  padding: 6px 8px;
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   &.level-1 {
-    padding-left: 0;
+    padding-left: 8px;
     font-weight: 500;
-  }
-  
-  &.level-2 {
-    padding-left: 16px;
     font-size: 14px;
   }
   
-  &.level-3 {
-    padding-left: 32px;
+  &.level-2 {
+    padding-left: 24px;
     font-size: 13px;
+  }
+  
+  &.level-3 {
+    padding-left: 40px;
+    font-size: 12px;
     color: #666;
   }
   
   &.level-4 {
-    padding-left: 48px;
+    padding-left: 56px;
     font-size: 12px;
     color: #999;
   }
   
   &.level-5 {
-    padding-left: 64px;
+    padding-left: 72px;
     font-size: 12px;
     color: #999;
   }
   
   &.level-6 {
-    padding-left: 80px;
+    padding-left: 88px;
     font-size: 12px;
     color: #999;
   }
@@ -76,6 +87,11 @@ const OutlineItem = styled.li`
     background-color: #e6f7ff;
     color: #1890ff;
     font-weight: 500;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-wrap: break-word;
+    word-break: break-word;
   }
 `;
 

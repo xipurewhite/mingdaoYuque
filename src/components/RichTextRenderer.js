@@ -13,8 +13,8 @@ const DocumentTitle = styled.h1`
   font-size: 2.5em;
   font-weight: 700;
   color: #1a1a1a;
-  margin: 0 0 24px 0;
-  padding: 0 0 16px 0;
+  margin: 0;
+  padding: 24px 16px 16px 16px;
   border-bottom: 2px solid #eaecef;
   line-height: 1.2;
   text-align: left;
@@ -22,37 +22,41 @@ const DocumentTitle = styled.h1`
   /* 响应式字体大小 */
   @media (max-width: 768px) {
     font-size: 2em;
-    margin-bottom: 20px;
-    padding-bottom: 12px;
+    padding: 20px 12px 12px 12px;
   }
   
   @media (min-width: 1200px) {
-    font-size: 2.8em;
-    margin-bottom: 28px;
-    padding-bottom: 20px;
+    font-size: 2em;
+    padding: 28px 20px 20px 20px;
   }
 `;
 
 const ContentContainer = styled.div`
   width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 24px 16px;
   line-height: 1.8;
   color: #333;
+  /* 移动端防止横向溢出 */
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
   
   /* V2版本：优化阅读体验 */
   font-size: 16px;
   max-width: none;
   
-  /* 响应式字体大小 */
+  /* 响应式字体大小和间距 */
   @media (max-width: 768px) {
     font-size: 15px;
     line-height: 1.7;
+    padding: 20px 12px;
   }
   
   @media (min-width: 1200px) {
     font-size: 17px;
     line-height: 1.9;
+    padding: 28px 20px;
   }
   
   /* V2版本：优化标题样式 */
@@ -61,7 +65,7 @@ const ContentContainer = styled.div`
     font-weight: 600;
     line-height: 1.3;
     color: #1a1a1a;
-    scroll-margin-top: 80px; /* 为固定导航栏留出空间 */
+    scroll-margin-top: 50px; /* 为固定导航栏留出空间 */
     
     /* 添加标题锚点样式 */
     position: relative;
@@ -77,32 +81,32 @@ const ContentContainer = styled.div`
   }
   
   h1 {
-    font-size: 2.2em;
+    font-size: 2em !important; /* 32px @ 16px base - 参考飞书文档 */
     border-bottom: 2px solid #eaecef;
     padding-bottom: 0.4em;
     margin-top: 0;
   }
   
   h2 {
-    font-size: 1.8em;
+    font-size: 1.5em !important; /* 24px @ 16px base - 参考飞书文档 */
     border-bottom: 1px solid #eaecef;
     padding-bottom: 0.3em;
   }
   
   h3 {
-    font-size: 1.4em;
+    font-size: 1.25em !important; /* 20px @ 16px base - 参考飞书文档 */
   }
   
   h4 {
-    font-size: 1.2em;
+    font-size: 1.125em !important; /* 18px @ 16px base - 参考飞书文档 */
   }
   
   h5 {
-    font-size: 1.1em;
+    font-size: 1em !important; /* 16px @ 16px base - 参考飞书文档 */
   }
   
   h6 {
-    font-size: 1em;
+    font-size: 0.875em !important; /* 14px @ 16px base - 参考飞书文档 */
     color: #6a737d;
   }
   
@@ -159,6 +163,8 @@ const ContentContainer = styled.div`
     border-collapse: collapse;
     margin: 24px 0;
     width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
     border: 1px solid #d0d7de;
     border-radius: 6px;
     overflow: hidden;
@@ -170,6 +176,7 @@ const ContentContainer = styled.div`
     padding: 12px 16px;
     text-align: left;
     vertical-align: top;
+    word-break: break-word;
   }
   
   th {
@@ -204,6 +211,7 @@ const ContentContainer = styled.div`
     font-size: 87%;
     line-height: 1.5;
     overflow: auto;
+    max-width: 100%;
     padding: 20px;
     margin: 24px 0;
     border: 1px solid #e1e4e8;
@@ -471,7 +479,9 @@ export default function RichTextRenderer({
   content, 
   title = '文档内容',
   documentId,
-  onContentChange 
+  onContentChange,
+  isExternalMode = false,
+  documentNotFound = false
 }) {
   const contentRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -702,6 +712,19 @@ export default function RichTextRenderer({
     }
   }, [selectedImage, isDragging]);
 
+  // 外部模式：如果文档不存在，显示特殊提示
+  if (documentNotFound) {
+    return (
+      <ContentContainer>
+        <EmptyState>
+          <div className="empty-icon">⚠️</div>
+          <div className="empty-text">文档不存在</div>
+          <div className="empty-hint">指定的文档ID无法找到，可能已被删除或不存在</div>
+        </EmptyState>
+      </ContentContainer>
+    );
+  }
+  
   if (!content || !content.trim()) {
     return (
       <>
@@ -713,7 +736,9 @@ export default function RichTextRenderer({
           <EmptyState>
             <div className="empty-icon">📄</div>
             <div className="empty-text">暂无内容</div>
-            <div className="empty-hint">请选择左侧的文档查看内容</div>
+            {!isExternalMode && (
+              <div className="empty-hint">请选择左侧的文档查看内容</div>
+            )}
           </EmptyState>
         </ContentContainer>
       </>

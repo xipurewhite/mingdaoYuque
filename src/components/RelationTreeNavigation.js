@@ -1,27 +1,21 @@
 /**
- * 基于关联记录的树形导航组件
+ * 基于关联记录的树形导航组件（简化版，无缓存无懒加载）
  */
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { buildRelationTree, loadChildNodes, detectCircularReferences } from '../utils/dataUtils';
-import { parseRelationData } from '../utils/dataUtils';
-import { treeCache } from '../utils/treeCache';
+import { buildCompleteRelationTree, parseRelationData } from '../utils/dataUtils';
 import TreeErrorBoundary from './TreeErrorBoundary';
 import { env } from 'mdye';
 
 const TreeContainer = styled.div`
-  padding: 16px;
-  height: 100%;
-  overflow-y: auto;
+  padding: 8px 16px 16px 16px;
   
-  /* V2版本：响应式优化 */
   @media (max-width: 768px) {
-    padding: 12px;
+    padding: 6px 12px 12px 12px;
     font-size: 14px;
   }
   
-  /* 滚动条样式优化 */
   &::-webkit-scrollbar {
     width: 6px;
   }
@@ -48,11 +42,13 @@ const TreeNode = styled.div`
 const NodeHeader = styled.div`
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 6px 12px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 4px;
   transition: all 0.2s ease;
-  min-height: 44px; /* V2版本：触摸友好 */
+  min-height: 28px;
+  line-height: 1.4;
+  min-width: 0;
   
   &:hover {
     background-color: #f0f0f0;
@@ -63,43 +59,12 @@ const NodeHeader = styled.div`
     background-color: #e6f7ff;
     color: #1890ff;
     font-weight: 500;
-  }
-  
-  &.loading {
-    opacity: 0.6;
-    cursor: wait;
-  }
-  
-  /* V2版本：触摸反馈 */
-  &:active {
-    transform: scale(0.98);
+    align-items: flex-start;
   }
   
   @media (max-width: 768px) {
-    padding: 12px;
-    min-height: 48px;
-  }
-`;
-
-const ExpandIcon = styled.span`
-  margin-right: 8px;
-  font-size: 12px;
-  color: #666;
-  transition: transform 0.2s;
-  min-width: 12px;
-  text-align: center;
-  
-  &.expanded {
-    transform: rotate(90deg);
-  }
-  
-  &.loading {
-    animation: spin 1s linear infinite;
-  }
-  
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    padding: 8px 12px;
+    min-height: 32px;
   }
 `;
 
@@ -118,6 +83,8 @@ const ExpandButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
   
   &:hover {
     background-color: #f0f0f0;
@@ -127,74 +94,41 @@ const ExpandButton = styled.button`
   &:active {
     transform: scale(0.9);
   }
-  
-  &.loading {
-    animation: spin 1s linear infinite;
-  }
-  
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
 `;
 
 const NodeTitle = styled.span`
   font-size: 14px;
   color: #333;
   flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
   
   .active & {
     color: #1890ff;
     font-weight: 500;
-  }
-  
-  .orphan-group & {
-    color: #ff7875;
-    font-style: italic;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-wrap: break-word;
+    word-break: break-word;
   }
 `;
 
 const NodeChildren = styled.div`
-  margin-left: 20px;
-  border-left: 2px solid #e8e8e8;
+  margin-left: 16px;
+  border-left: 1px solid #e8e8e8;
   padding-left: 12px;
-  margin-top: 4px;
+  margin-top: 2px;
   
-  /* V2版本：优化层级显示 */
   ${TreeNode} {
-    margin-bottom: 2px;
+    margin-bottom: 4px;
   }
   
-  /* 嵌套层级样式 */
   ${NodeChildren} {
     border-left-color: #d0d0d0;
-    margin-left: 16px;
-  }
-`;
-
-const LoadingIndicator = styled.div`
-  padding: 8px 12px;
-  color: #999;
-  font-size: 12px;
-  text-align: center;
-  margin-left: 20px;
-  
-  &::before {
-    content: "⏳";
-    margin-right: 4px;
-  }
-`;
-
-const ErrorIndicator = styled.div`
-  padding: 8px 12px;
-  color: #ff4d4f;
-  font-size: 12px;
-  text-align: center;
-  margin-left: 20px;
-  
-  &::before {
-    content: "❌";
-    margin-right: 4px;
+    margin-left: 14px;
   }
 `;
 
@@ -210,8 +144,26 @@ const EmptyState = styled.div`
   }
 `;
 
+const LoadingState = styled.div`
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  padding: 40px 20px;
+  
+  .loading-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
 /**
- * 关联记录树节点组件
+ * 树节点组件（简化版）
  */
 function RelationTreeNode({ 
   node, 
@@ -219,187 +171,131 @@ function RelationTreeNode({
   onDocumentSelect, 
   selectedDocumentId,
   level = 0,
-  api,
-  config,
-  childrenFieldId,
-  onNodeLoad,
-  expandPath
+  expandPath = new Set(), // 需要展开的路径
+  expandPathVersion = 0, // 展开路径版本号，用于强制展开
+  expandedStateMap, // 全局展开状态映射
+  setExpandedState, // 设置展开状态的函数
+  manuallyCollapsedMap, // 全局手动收缩标记映射
+  setManuallyCollapsed // 设置手动收缩标记的函数
 }) {
-  const [isExpanded, setIsExpanded] = useState(false); // 默认不展开，避免状态冲突
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState(null);
-  const [childNodes, setChildNodes] = useState([]);
-  const [loadedOnce, setLoadedOnce] = useState(false);
+  // 从全局状态获取展开状态，如果不存在则默认为 false
+  // 使用 useMemo 确保在 expandedStateMap 更新时重新计算
+  const isExpanded = useMemo(() => {
+    return expandedStateMap.get(node.id) || false;
+  }, [expandedStateMap, node.id]);
   
-  // 使用 ref 来跟踪实际的展开状态，避免闭包问题
-  const isExpandedRef = useRef(false);
+  const manuallyCollapsedRef = useRef(manuallyCollapsedMap.get(node.id) || false);
+  const lastExpandPathVersionRef = useRef(0); // 记录上次的展开路径版本号
   
-  const hasChildren = (node.hasChildren || (node.children && node.children.length > 0));
+  // 同步 manuallyCollapsedRef 和全局状态
+  useEffect(() => {
+    manuallyCollapsedRef.current = manuallyCollapsedMap.get(node.id) || false;
+  }, [manuallyCollapsedMap, node.id]);
+  
+  // 如果节点在展开路径上，自动展开
+  // 当 expandPathVersion 变化时，强制清除手动收缩标记并展开（用于跳转场景）
+  useEffect(() => {
+    const isInPath = expandPath.has(node.id);
+    
+    // 如果展开路径版本号变化了，说明是新的跳转操作，需要强制展开路径上的节点
+    if (isInPath && expandPathVersion > lastExpandPathVersionRef.current) {
+      // 清除手动收缩标记（因为这是系统强制展开，用于显示跳转路径）
+      manuallyCollapsedRef.current = false;
+      setManuallyCollapsed(node.id, false);
+      // 强制展开
+      if (!isExpanded) {
+        setExpandedState(node.id, true);
+      }
+      // 更新版本号记录
+      lastExpandPathVersionRef.current = expandPathVersion;
+    }
+    // 如果节点在展开路径上，且当前是收缩状态，且用户没有手动收缩过，则自动展开
+    else if (isInPath && !isExpanded && !manuallyCollapsedRef.current) {
+      setExpandedState(node.id, true);
+      // 自动展开时，清除手动收缩标记（因为这是系统自动展开的）
+      manuallyCollapsedRef.current = false;
+      setManuallyCollapsed(node.id, false);
+    }
+  }, [expandPath, expandPathVersion, node.id, isExpanded, setExpandedState, setManuallyCollapsed]);
+  
+  const hasChildren = node.children && node.children.length > 0;
   const isDocument = !node.isGroup;
   const isActive = selectedDocumentId === node.id;
-  const shouldExpand = !!expandPath && expandPath.has(node.id);
-
-  // 外部定位路径：若该节点在需要展开的路径上，则自动展开（自动触发懒加载）
-  useEffect(() => {
-    if (shouldExpand && !isExpandedRef.current) {
-      // 搜索定位触发展开：强制打开并允许懒加载
-      handleToggle(true);
-    }
-  }, [shouldExpand, node.id, handleToggle]);
   
-  const handleExpandClick = useCallback((e) => {
-    e.stopPropagation();
-    handleToggle();
-  }, [handleToggle]);
-  
-  const handleToggle = useCallback(async (force = false) => {
-    console.log('handleToggle被调用:', { 
-      hasChildren, 
-      isExpanded, 
-      isExpandedRef: isExpandedRef.current,
-      loadedOnce, 
-      nodeId: node.id,
-      childNodesLength: childNodes.length,
-      nodeIsLoaded: node.isLoaded,
-      force
-    });
-    
-    // 如果不是强制模式且没有子级标记，则直接返回；
-    // 强制模式用于搜索定位场景，即使未标记子级也尝试懒加载
-    if (!hasChildren && !force) {
-      console.log('节点没有子级，直接返回');
-      return;
+  const handleToggle = useCallback((e) => {
+    if (e) {
+      e.stopPropagation();
     }
-    
-    // 使用 ref 来获取当前状态，避免闭包问题
-    const currentExpanded = isExpandedRef.current;
-    console.log('当前展开状态:', currentExpanded);
-    
-    if (currentExpanded) {
-      console.log('收起节点');
-      setIsExpanded(false);
-      isExpandedRef.current = false;
-      return;
-    }
-    
-    console.log('准备展开节点');
-    setIsExpanded(true);
-    isExpandedRef.current = true;
-    
-    // 如果子节点已经加载过，直接展开，不需要重新加载
-    if (loadedOnce || (childNodes && childNodes.length > 0)) {
-      console.log('子节点已加载过，直接展开');
-      return;
-    }
-    
-    // 如果子节点未加载且需要懒加载
-    if (!node.isLoaded && childrenFieldId && api && config) {
-      setIsLoading(true);
-      setLoadError(null);
-      
-      try {
-        // 检查缓存
-        const cachedChildren = treeCache.getCachedChildren(config.worksheetId, node.id);
-        if (cachedChildren) {
-          console.log('使用缓存的子节点数据:', node.id);
-          setChildNodes(cachedChildren);
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log('开始懒加载子节点:', node.id);
-        const loadedChildren = await loadChildNodes(api, config, node.id, childrenFieldId);
-        
-        // 更新节点映射表
-        const newChildNodes = loadedChildren.map(child => ({
-          ...child,
-          level: level + 1,
-          parentId: node.id
-        }));
-        
-        // 缓存子节点数据
-        treeCache.cacheChildren(config.worksheetId, node.id, newChildNodes);
-        
-        setChildNodes(newChildNodes);
-        setLoadedOnce(true);
-        
-        // 通知父组件更新节点映射表
-        if (onNodeLoad) {
-          onNodeLoad(node.id, newChildNodes);
-        }
-        
-        console.log('懒加载完成:', newChildNodes.length, '个子节点');
-      } catch (error) {
-        console.error('懒加载失败:', error);
-        setLoadError(error.message);
-      } finally {
-        setIsLoading(false);
+    if (hasChildren) {
+      const newExpandedState = !isExpanded;
+      setExpandedState(node.id, newExpandedState);
+      // 如果用户手动收缩，记录这个状态
+      if (!newExpandedState) {
+        manuallyCollapsedRef.current = true;
+        setManuallyCollapsed(node.id, true);
+      } else {
+        // 如果用户手动展开，清除标记
+        manuallyCollapsedRef.current = false;
+        setManuallyCollapsed(node.id, false);
       }
     }
-  }, [hasChildren, node.isLoaded, node.id, childrenFieldId, api, config, level, onNodeLoad, loadedOnce, childNodes]);
+  }, [hasChildren, isExpanded, node.id, setExpandedState, setManuallyCollapsed]);
   
-  const handleDocumentClick = useCallback((doc) => {
-    onDocumentSelect(doc);
-  }, [onDocumentSelect]);
+  const handleHeaderClick = useCallback((e) => {
+    if (e.target.closest('button')) {
+      return;
+    }
+    
+    // 如果节点有子节点，先切换展开/收缩状态
+    if (hasChildren) {
+      // 先切换状态
+      const newExpandedState = !isExpanded;
+      setExpandedState(node.id, newExpandedState);
+      
+      // 如果用户手动收缩，记录这个状态（防止自动展开）
+      if (!newExpandedState) {
+        manuallyCollapsedRef.current = true;
+        setManuallyCollapsed(node.id, true);
+      } else {
+        // 如果用户手动展开，清除标记
+        manuallyCollapsedRef.current = false;
+        setManuallyCollapsed(node.id, false);
+      }
+    }
+    
+    // 如果是文档，选择文档
+    if (isDocument) {
+      onDocumentSelect(node);
+    }
+  }, [hasChildren, isDocument, node, onDocumentSelect, isExpanded, setExpandedState, setManuallyCollapsed]);
   
-  // 渲染子节点
-  const renderChildren = () => {
-    if (!isExpanded) return null;
-    
-    if (isLoading) {
-      return <LoadingIndicator>加载中...</LoadingIndicator>;
-    }
-    
-    if (loadError) {
-      return <ErrorIndicator>加载失败: {loadError}</ErrorIndicator>;
-    }
-    
-    const childrenToRender = childNodes.length > 0 ? childNodes : 
-      (node.children || []).map(childId => nodeMap.get(childId)).filter(Boolean);
-    
-    if (childrenToRender.length === 0) {
-      return null;
-    }
-    
-    return (
-      <NodeChildren>
-        {childrenToRender.map(childNode => (
-          <RelationTreeNode
-            key={childNode.id}
-            node={childNode}
-            nodeMap={nodeMap}
-            onDocumentSelect={onDocumentSelect}
-            selectedDocumentId={selectedDocumentId}
-            level={level + 1}
-            api={api}
-            config={config}
-            childrenFieldId={childrenFieldId}
-            onNodeLoad={onNodeLoad}
-            expandPath={expandPath}
-          />
-        ))}
-      </NodeChildren>
-    );
-  };
+  // 获取子节点
+  const childNodes = useMemo(() => {
+    if (!hasChildren || !node.children) return [];
+    return node.children
+      .map(childId => nodeMap.get(childId))
+      .filter(Boolean)
+      .sort((a, b) => {
+        // 按标题排序
+        return (a.title || '').localeCompare(b.title || '');
+      });
+  }, [hasChildren, node.children, nodeMap]);
   
   return (
     <TreeNode>
       <NodeHeader 
-        onClick={isDocument ? () => handleDocumentClick(node) : undefined}
-        className={`${isActive ? 'active' : ''} ${isLoading ? 'loading' : ''}`}
+        onClick={handleHeaderClick}
+        className={isActive ? 'active' : ''}
         data-node-id={node.id}
+        style={{ cursor: hasChildren || isDocument ? 'pointer' : 'default' }}
       >
         {hasChildren && (
           <ExpandButton 
-            onClick={(e) => {
-              console.log('按钮被点击，当前状态:', { isExpanded, hasChildren, nodeId: node.id });
-              handleExpandClick(e);
-            }}
-            className={isLoading ? 'loading' : ''}
+            onClick={handleToggle}
             title={isExpanded ? '收起子级' : '展开子级'}
             aria-label={isExpanded ? '收起子级' : '展开子级'}
           >
-            {isLoading ? '⟳' : (isExpanded ? '−' : '+')}
+            {isExpanded ? '−' : '+'}
           </ExpandButton>
         )}
         <NodeTitle className={node.isGroup ? 'orphan-group' : ''}>
@@ -407,13 +303,32 @@ function RelationTreeNode({
         </NodeTitle>
       </NodeHeader>
       
-      {renderChildren()}
+      {isExpanded && hasChildren && childNodes.length > 0 && (
+        <NodeChildren>
+          {childNodes.map(childNode => (
+            <RelationTreeNode
+              key={childNode.id}
+              node={childNode}
+              nodeMap={nodeMap}
+              onDocumentSelect={onDocumentSelect}
+              selectedDocumentId={selectedDocumentId}
+              level={level + 1}
+              expandPath={expandPath}
+              expandPathVersion={expandPathVersion}
+              expandedStateMap={expandedStateMap}
+              setExpandedState={setExpandedState}
+              manuallyCollapsedMap={manuallyCollapsedMap}
+              setManuallyCollapsed={setManuallyCollapsed}
+            />
+          ))}
+        </NodeChildren>
+      )}
     </TreeNode>
   );
 }
 
 /**
- * 基于关联记录的树形导航主组件
+ * 基于关联记录的树形导航主组件（简化版）
  */
 export default function RelationTreeNavigation({ 
   documents,
@@ -424,7 +339,7 @@ export default function RelationTreeNavigation({
   parentFieldId,
   childrenFieldId
 }) {
-  // 建立原始文档索引，确保从树选择时能拿到完整文档信息
+  // 建立原始文档索引
   const originalDocsMap = useMemo(() => {
     const map = new Map();
     (documents || []).forEach(d => { if (d && d.id) map.set(d.id, d); });
@@ -434,87 +349,269 @@ export default function RelationTreeNavigation({
   // 容器引用，用于滚动定位
   const containerRef = useRef(null);
 
-  // 展开路径（支持异步解析）
-  const [externalExpandPath, setExternalExpandPath] = useState(null);
-  
-  // 字段ID（用于必要时补齐文档详情）
+  // 字段ID
   const titleFieldId = env?.titleFieldId?.[0];
-  const contentFieldId = env?.contentFieldId?.[0];
-  // 构建树状结构（带缓存）
-  const treeStructure = useMemo(() => {
-    if (!documents || documents.length === 0) {
-      return { nodeMap: new Map(), rootNodes: [], orphanNodes: [] };
+  
+  // 树状结构和加载状态
+  const [treeStructure, setTreeStructure] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+    
+  // 一次性加载所有数据并构建树状结构
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function loadTree() {
+      if (!documents || documents.length === 0) {
+        if (isMounted) {
+          setTreeStructure({ nodeMap: new Map(), rootNodes: [], orphanNodes: [] });
+          setIsLoading(false);
+        }
+        return;
+      }
+      
+      if (!parentFieldId || !childrenFieldId || !api || !config) {
+        if (isMounted) {
+          setLoadError('缺少必要的配置参数');
+          setIsLoading(false);
+        }
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+        
+        console.log('开始一次性加载所有数据并构建树状结构...');
+        
+        // 使用新的函数一次性加载所有数据
+        const structure = await buildCompleteRelationTree(
+          documents,
+          parentFieldId,
+          childrenFieldId,
+          api,
+          config,
+          titleFieldId
+        );
+        
+        if (isMounted) {
+          setTreeStructure(structure);
+          setIsLoading(false);
+          console.log('树状结构加载完成:', {
+      根节点数量: structure.rootNodes?.length || 0,
+            节点总数: structure.nodeMap?.size || 0
+          });
+        }
+      } catch (error) {
+        console.error('加载树状结构失败:', error);
+        if (isMounted) {
+          setLoadError(error.message || '加载失败');
+          setIsLoading(false);
+        }
+      }
     }
     
-    // 检查缓存
-    const cacheKey = `${config.worksheetId}_${config.viewId}`;
-    const cachedStructure = treeCache.getCachedTreeStructure(config.worksheetId, config.viewId);
+    loadTree();
     
-    if (cachedStructure && treeCache.isCacheValid(config.worksheetId, config.viewId, documents[0]?.updateTime)) {
-      console.log('使用缓存的树状结构');
-      return cachedStructure;
-    }
-    
-    console.log('开始构建关联记录树状结构...');
-    const structure = buildRelationTree(documents, parentFieldId, childrenFieldId);
-    
-    // 检测循环引用
-    const cycles = detectCircularReferences(structure.nodeMap);
-    if (cycles.length > 0) {
-      console.warn('检测到循环引用:', cycles);
-    }
-    
-    // 添加缓存信息
-    structure.lastUpdateTime = new Date().toISOString();
-    structure.cacheKey = cacheKey;
-    
-    // 缓存树状结构
-    treeCache.cacheTreeStructure(config.worksheetId, config.viewId, structure);
-    
-    return structure;
-  }, [documents, parentFieldId, childrenFieldId, config.worksheetId, config.viewId]);
+    return () => {
+      isMounted = false;
+    };
+  }, [documents, parentFieldId, childrenFieldId, api, config, titleFieldId]);
 
-  // ============ 外部定位：根据选中文档计算展开路径 ============
+  // 计算从根节点到目标节点的路径
   const getPathToNode = useCallback((nodeId) => {
     const path = [];
     if (!nodeId || !treeStructure || !treeStructure.nodeMap) return path;
+    
     let current = treeStructure.nodeMap.get(nodeId);
     while (current) {
       path.unshift(current.id);
       if (!current.parentId) break;
       current = treeStructure.nodeMap.get(current.parentId);
     }
+    
     return path;
   }, [treeStructure]);
 
-  const expandPath = useMemo(() => {
-    if (externalExpandPath) return externalExpandPath;
-    if (!selectedDocumentId) return null;
-    const ids = getPathToNode(selectedDocumentId);
-    if (!ids || ids.length === 0) return null;
-    return new Set(ids);
-  }, [selectedDocumentId, getPathToNode, externalExpandPath]);
+  // 展开路径状态（用于自动展开到目标节点）
+  const [expandPath, setExpandPath] = useState(new Set());
+  // 展开路径版本号（用于强制展开，即使节点被手动收缩过）
+  const [expandPathVersion, setExpandPathVersion] = useState(0);
+  
+  // 全局展开状态映射（用于保持子节点的展开状态，即使父节点收缩）
+  const [expandedStateMap, setExpandedStateMap] = useState(() => new Map());
+  // 全局手动收缩标记映射
+  const [manuallyCollapsedMap, setManuallyCollapsedMap] = useState(() => new Map());
+  
+  // 设置展开状态的函数
+  const setExpandedState = useCallback((nodeId, expanded) => {
+    setExpandedStateMap(prev => {
+      const newMap = new Map(prev);
+      if (expanded) {
+        newMap.set(nodeId, true);
+      } else {
+        newMap.delete(nodeId);
+      }
+      return newMap;
+    });
+  }, []);
+  
+  // 设置手动收缩标记的函数
+  const setManuallyCollapsed = useCallback((nodeId, collapsed) => {
+    setManuallyCollapsedMap(prev => {
+      const newMap = new Map(prev);
+      if (collapsed) {
+        newMap.set(nodeId, true);
+      } else {
+        newMap.delete(nodeId);
+      }
+      return newMap;
+    });
+  }, []);
 
-  // 当选中的文档变化时，滚动树容器使其可见
+  // 当选中的文档变化时，计算展开路径并展开
   useEffect(() => {
-    if (!selectedDocumentId) return;
+    if (!selectedDocumentId || !treeStructure) {
+      setExpandPath(new Set());
+      return;
+    }
+    
+    const path = getPathToNode(selectedDocumentId);
+    if (path.length > 0) {
+      // 展开路径上的所有节点（除了目标节点本身）
+      const pathToExpand = new Set(path.slice(0, -1)); // 不包括目标节点本身
+      setExpandPath(pathToExpand);
+      // 递增版本号，强制展开路径上的节点（即使之前被手动收缩过）
+      setExpandPathVersion(prev => prev + 1);
+      
+      // 延迟滚动，等待展开动画完成
     const container = containerRef.current;
-    if (!container) return;
-    // 延迟以等待可能的懒加载与渲染
+      if (container) {
     const timer = setTimeout(() => {
       const target = container.querySelector(`[data-node-id="${selectedDocumentId}"]`);
       if (target && typeof target.scrollIntoView === 'function') {
         target.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
-    }, 150);
+        }, 300); // 增加延迟时间，确保展开动画完成
     return () => clearTimeout(timer);
-  }, [selectedDocumentId]);
+      }
+    } else {
+      setExpandPath(new Set());
+    }
+  }, [selectedDocumentId, treeStructure, getPathToNode]);
   
-  // 处理节点加载
-  const handleNodeLoad = useCallback((nodeId, childNodes) => {
-    // 这里可以更新全局的节点映射表
-    console.log('节点加载完成:', nodeId, childNodes.length);
-  }, []);
+  // 处理文档选择
+  const handleDocumentSelect = useCallback(async (nodeDoc) => {
+    // 优先使用原始文档，保证系统字段不丢失
+    let fullDoc = originalDocsMap.get(nodeDoc.id);
+    
+    // 如果原始文档存在且有内容，直接使用
+    if (fullDoc && fullDoc.content && fullDoc.content.trim()) {
+      onDocumentSelect(fullDoc);
+      return;
+    }
+    
+    // 如果原始文档不存在或内容为空，需要获取完整文档详情
+    if (!fullDoc || !fullDoc.content || !fullDoc.content.trim()) {
+      try {
+        console.log('文档内容为空，开始获取完整文档详情:', nodeDoc.id);
+        
+        // 使用getRowDetail获取完整文档信息
+        const result = await api.getRowDetail({
+          appId: config.appId,
+          worksheetId: config.worksheetId,
+          viewId: config.viewId,
+          rowId: nodeDoc.id,
+          getTemplate: false
+        });
+
+        console.log('getRowDetail API调用结果:', result);
+
+        // 处理不同的返回数据格式
+        let updatedRecord = null;
+        if (result && result.data) {
+          updatedRecord = result.data;
+        } else if (result && result.rowData) {
+          try {
+            updatedRecord = JSON.parse(result.rowData);
+            console.log('解析rowData成功:', updatedRecord);
+          } catch (parseError) {
+            console.error('解析rowData失败:', parseError);
+            throw new Error('无法解析返回的数据格式');
+          }
+        } else {
+          console.warn('getRowDetail返回的数据格式不正确:', result);
+          throw new Error('API返回数据格式不正确');
+        }
+
+        if (updatedRecord) {
+          // 获取字段ID配置
+          const contentFieldId = env?.contentFieldId?.[0];
+          
+          // 构建完整的文档对象
+          fullDoc = {
+            id: updatedRecord.rowid || nodeDoc.id,
+            title: (titleFieldId && updatedRecord[titleFieldId]) || nodeDoc.title || '无标题',
+            content: (contentFieldId && updatedRecord[contentFieldId]) || '',
+            uaid: updatedRecord.uaid || nodeDoc.rawRecord?.uaid,
+            utime: updatedRecord.utime || nodeDoc.rawRecord?.utime,
+            rawRecord: updatedRecord,
+            category: null,
+            createTime: updatedRecord.ctime || nodeDoc.rawRecord?.ctime || '',
+            updateTime: updatedRecord.utime || nodeDoc.rawRecord?.utime || '',
+            creator: '未知'
+          };
+          
+          console.log('获取到完整文档详情:', fullDoc);
+          console.log('内容长度:', fullDoc.content?.length || 0);
+          
+          onDocumentSelect(fullDoc);
+          return;
+        } else {
+          throw new Error('无法获取文档详情数据');
+        }
+      } catch (error) {
+        console.error('获取文档详情失败:', error);
+        // 即使获取失败，也使用已有数据，至少可以显示标题
+        fullDoc = fullDoc || {
+          id: nodeDoc.id,
+          title: nodeDoc.title,
+          content: nodeDoc.content || '',
+          rawRecord: nodeDoc.rawRecord || nodeDoc.rawDocument
+        };
+        onDocumentSelect(fullDoc);
+        return;
+      }
+    }
+    
+    // 如果原始文档存在且有内容，直接使用
+    onDocumentSelect(fullDoc);
+  }, [originalDocsMap, onDocumentSelect, api, config, titleFieldId]);
+  
+  if (isLoading) {
+    return (
+      <TreeContainer>
+        <LoadingState>
+          <div className="loading-icon">⏳</div>
+          <div>加载中...</div>
+        </LoadingState>
+      </TreeContainer>
+    );
+  }
+  
+  if (loadError) {
+    return (
+      <TreeContainer>
+        <EmptyState>
+          <div className="empty-icon">⚠️</div>
+          <div>加载失败</div>
+          <div style={{ fontSize: '12px', marginTop: '8px' }}>
+            {loadError}
+          </div>
+        </EmptyState>
+      </TreeContainer>
+    );
+  }
   
   if (!documents || documents.length === 0) {
     return (
@@ -527,7 +624,7 @@ export default function RelationTreeNavigation({
     );
   }
   
-  if (treeStructure.rootNodes.length === 0) {
+  if (!treeStructure || treeStructure.rootNodes.length === 0) {
     return (
       <TreeContainer>
         <EmptyState>
@@ -549,53 +646,15 @@ export default function RelationTreeNavigation({
             key={rootNode.id}
             node={rootNode}
             nodeMap={treeStructure.nodeMap}
-            onDocumentSelect={async (nodeDoc) => {
-              // 优先使用原始文档，保证uaid/utime/rawRecord等系统字段不丢失
-              let fullDoc = originalDocsMap.get(nodeDoc.id);
-              if (!fullDoc) {
-                try {
-                  // 若原始文档不存在，尝试补齐详情
-                  const result = await api.getRowDetail({
-                    appId: config.appId,
-                    worksheetId: config.worksheetId,
-                    viewId: config.viewId,
-                    rowId: nodeDoc.id,
-                    getTemplate: false
-                  });
-                  let record = null;
-                  if (result && result.data) {
-                    record = result.data;
-                  } else if (result && result.rowData) {
-                    try { record = JSON.parse(result.rowData); } catch (_) { record = null; }
-                  }
-                  if (record) {
-                    fullDoc = {
-                      id: record.rowid || nodeDoc.id,
-                      title: (titleFieldId ? record[titleFieldId] : nodeDoc.title) || nodeDoc.title,
-                      content: (contentFieldId ? record[contentFieldId] : nodeDoc.content) || nodeDoc.content,
-                      category: null,
-                      createTime: record.ctime,
-                      updateTime: record.utime,
-                      creator: undefined,
-                      uaid: record.uaid,
-                      utime: record.utime,
-                      rawRecord: record
-                    };
-                  }
-                } catch (e) {
-                  // 失败则至少返回节点已有信息，避免选择无响应
-                  fullDoc = nodeDoc;
-                }
-              }
-              onDocumentSelect(fullDoc || nodeDoc);
-            }}
+            onDocumentSelect={handleDocumentSelect}
             selectedDocumentId={selectedDocumentId}
             level={0}
-            api={api}
-            config={config}
-            childrenFieldId={childrenFieldId}
-            onNodeLoad={handleNodeLoad}
             expandPath={expandPath}
+            expandPathVersion={expandPathVersion}
+            expandedStateMap={expandedStateMap}
+            setExpandedState={setExpandedState}
+            manuallyCollapsedMap={manuallyCollapsedMap}
+            setManuallyCollapsed={setManuallyCollapsed}
           />
         ))}
       </TreeContainer>
